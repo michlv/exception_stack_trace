@@ -1,0 +1,8 @@
+C++ library enable stack trace from exceptions.
+
+This is proof of concept code, if you are interested, feel free to improve. It is annoying that one cannot get stack trace from exceptions in C++, so this code should allow for this.
+
+This is by no means production code, but as it stands it seems to work, at least with my non-automated tests.
+
+Vladimir Michl
+ 
