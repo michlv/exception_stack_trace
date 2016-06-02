@@ -20,7 +20,7 @@ namespace {
     void *real = dlsym(RTLD_NEXT, function);
     if (!real) {
       fprintf(stderr, "ERROR: cannot find libstdc++.%s: %s\n", function, dlerror());
-      _exit(1);
+      std::terminate();
     }
     return real;
   };
