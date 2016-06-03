@@ -31,54 +31,24 @@ struct MyException : public std::runtime_error {
   };
 };
 
-void testRuntimeError() {
-  try {
-    std::cout << "about to throw" << std::endl;
-    throw std::runtime_error("Hello");
-  } catch (const std::exception &e) {
-    std::cout << "std::exception(runtime_error) caught: " << &e << std::endl;
-    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
-  } catch (...) {
-    std::cout << "Exception caught" << std::endl;
-  }
+#define THROW_TEST(name, throw_exception, catch_exception) \
+void name() { \
+  try { \
+    std::cout << #name << ": about to throw" << std::endl; \
+    throw throw_exception; \
+  } catch (const catch_exception &e) { \
+    std::cout << #catch_exception << "(" << #throw_exception << ") caught: " << &e << std::endl; \
+    std::cout << "stack: " << std::endl << get_stack_trace_names(e); \
+  } catch (...) { \
+    std::cout << "... caught" << std::endl; \
+  } \
+  std::cout << std::endl; \
 }
 
-void testRuntimeError1() {
-  try {
-    std::cout << "about to throw" << std::endl;
-    throw std::runtime_error("Hello");
-  } catch (const std::runtime_error &e) {
-    std::cout << "std::runtime_error caught: " << &e << std::endl;
-    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
-  } catch (...) {
-    std::cout << "Exception caught" << std::endl;
-  }
-}
-
-
-void testMyException() {
-  try {
-    std::cout << "about to throw" << std::endl;
-    throw MyException("Hello");
-  } catch (const std::exception &e) {
-    std::cout << "std::exception(MyException) caught: " << &e << std::endl;
-    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
-  } catch (...) {
-    std::cout << "Exception caught" << std::endl;
-  }
-}
-
-void testMyException1() {
-  try {
-    std::cout << "about to throw" << std::endl;
-    throw MyException("Hello");
-  } catch (const MyException &e) {
-    std::cout << "MyException caught: " << &e << std::endl;
-    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
-  } catch (...) {
-    std::cout << "Exception caught" << std::endl;
-  }
-}
+THROW_TEST(testRuntimeError, std::runtime_error("Hello"), std::exception);
+THROW_TEST(testRuntimeError1, std::runtime_error("Hello"), std::runtime_error);
+THROW_TEST(testMyException, MyException("Hello"), std::exception);
+THROW_TEST(testMyException1, MyException("Hello"), MyException);
 
 void testStdVector() {
   try {
@@ -86,10 +56,10 @@ void testStdVector() {
     std::vector<int> v;
     v.at(0);
   } catch (const std::exception &e) {
-    std::cout << "std::exception caught: " << &e << std::endl;
+    std::cout << "std::exception(vector.at(0)) caught: " << &e << std::endl;
     std::cout << "stack: " << std::endl << get_stack_trace_names(e);
   } catch (...) {
-    std::cout << "Exception caught" << std::endl;
+    std::cout << "... caught" << std::endl;
   }
 }
 

@@ -26,9 +26,17 @@
 #include <sstream>
 #include <typeinfo>
 #include <stdint.h>
+#include <cxxabi.h>
+#include <new>
 
 #define STACK_ENTRIES_MAX 64
 #define STACK_CONCURRENT_MAX 12
+
+#if 0
+# define DEBUG(x) x
+#else
+# define DEBUG(x)
+#endif
 
 namespace {
   void *(*real_cxa_allocate_exception)(size_t size) = 0;
@@ -45,7 +53,7 @@ namespace {
   };
 
   __attribute__((constructor)) void init() {
-    printf("init called\n");
+    DEBUG(printf("init called\n"));
     real_cxa_allocate_exception = (void *(*)(size_t))get_real_function("__cxa_allocate_exception");
     real_cxa_free_exception = (void *(*)(void *))get_real_function("__cxa_free_exception");
     real_cxa_throw = (void (*)(void *exception, struct std::type_info * tinfo, void (*dest)(void *)))get_real_function("__cxa_throw");
@@ -62,32 +70,39 @@ namespace {
     StackTrace *stack_trace;
   };
     
-  __thread int index=-1;
+  __thread int exception_data_index=-1;
   __thread ExceptionData exception_data[STACK_CONCURRENT_MAX];
+
+  char *demangle(const char *mangled_name, char *output_buffer, size_t *length, int *status) {
+    char *ret = abi::__cxa_demangle(mangled_name, output_buffer, length, status);
+    if (!ret)
+      return output_buffer;
+    return ret;
+  }
 }
 
 extern "C" {
   void * __cxa_allocate_exception(size_t size) {
     void *ret=0;
-    printf("exception allocated\n");
+    DEBUG(printf("exception allocated\n"));
     ret = real_cxa_allocate_exception(size+sizeof(StackTrace));
     void *stack=static_cast<uint8_t*>(ret)+size;
-    printf("exception allocated raw: %p\n", ret);
-    ++index;
-    exception_data[index].exception=ret;
-    exception_data[index].stack_trace = static_cast<StackTrace *>(stack);
-    printf("exception allocated ret: %p\n", ret);
+    DEBUG(printf("exception allocated raw: %p\n", ret));
+    ++exception_data_index;
+    exception_data[exception_data_index].exception=ret;
+    exception_data[exception_data_index].stack_trace = static_cast<StackTrace *>(stack);
+    DEBUG(printf("exception allocated ret: %p\n", ret));
     return ret;
   }
   void __cxa_free_exception(void *exception) {
-    printf("exception free in: %p\n", exception);
-    --index;
+    DEBUG(printf("exception free in: %p\n", exception));
+    --exception_data_index;
     real_cxa_free_exception(exception);
   }
 
   void __cxa_throw(void *exception, struct std::type_info * tinfo, void (*dest)(void *)) {
-    printf("throw in: %p\n", exception);
-    StackTrace &stack=*exception_data[index].stack_trace;
+    DEBUG(printf("throw in: %p\n", exception));
+    StackTrace &stack=*exception_data[exception_data_index].stack_trace;
     stack.size = backtrace(stack.stack, STACK_ENTRIES_MAX);
     stack.name = tinfo->name();
     real_cxa_throw(exception, tinfo, dest);
@@ -96,15 +111,15 @@ extern "C" {
 
 namespace exceptionstacktrace {
   int get_stack_trace_raw(void * const *&stacktrace, const char *&name, const void *exception) {
-    printf("stack trace raw: %p\n", exception);
+    DEBUG(printf("stack trace raw: %p\n", exception));
     const StackTrace *stack=0;
-    for (int i=index; i >=0; --i) {
+    for (int i=exception_data_index; i >=0; --i) {
       if (exception_data[i].exception == exception) {
 	stack = exception_data[i].stack_trace;
 	break;
       }
     }
-    printf("stack trace: %p\n", stack);
+    DEBUG(printf("stack trace: %p\n", stack));
     stacktrace = stack->stack;
     name = stack->name;
     return stack->size;
@@ -115,12 +130,29 @@ namespace exceptionstacktrace {
     void *const *stack;
     const char *name;
     int size=get_stack_trace_raw(stack, name, exception);
+    size_t bsize=64;
+    char *buffer=static_cast<char*>(malloc(bsize));
+    if (!buffer)
+      return "";
     char **text=backtrace_symbols(stack, size);
-    os << name << std::endl;
-    for (int i = 0; i < size; ++i) {
-      os << text[i] << std::endl;
+    int status;
+    buffer = demangle(name, buffer, &bsize, &status);
+    os << (status==0?buffer:name) << std::endl;
+    for (int i = stack_trace_raw_start_index; i < size; ++i) {
+      std::string str(text[i]);
+      size_t s=str.find_first_of('(');
+      size_t e=str.find_last_of('+');
+      if (s!=std::string::npos && e!=std::string::npos) {
+	std::string n = str.substr(s+1, e-s-1);
+	buffer=demangle(n.c_str(), buffer, &bsize, &status);
+	if (status == 0) {
+	  str.replace(s+1, e-s-1, buffer);
+	}
+      }
+      os << str << std::endl;
     }
     free(text);
+    free(buffer);
     return os.str();
   }
 

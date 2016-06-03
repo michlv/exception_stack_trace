@@ -21,6 +21,7 @@
 #include <stdexcept>
 
 namespace exceptionstacktrace {
+  const int stack_trace_raw_start_index = 1;
   int get_stack_trace_raw(void * const *&stacktrace, const char *&name, const void *exception);
   std::string get_stack_trace_names(const void *exception);
   std::string get_stack_trace_names(const std::exception &exception);
