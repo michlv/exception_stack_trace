@@ -1,26 +1,29 @@
 A library to get stack trace from C++ exceptions.
 
-This is proof of concept code, if you are interested, feel free to improve. It 
-is annoying, that one cannot get stack trace from exceptions in C++, so this 
-code should allow for this.
+This is proof of concept code, if you are interested, feel free to improve.
+
+It is annoying, that one cannot get stack trace from exceptions in C++, because
+I find them useful. The main design goal was:
+
+* no need for extra code, just write C++
+* should work for any exception, including ones thrown by C++ standard library
+  or any other third party one
 
 This is by no means production code, but as it stands it seems to work, at 
 least with my non-automated tests.
 
-Tried a few different approaches and the current one seems to work. I would 
-have liked not to need any info about exceptions in the module, keep all info 
-in exception allocated memory itself. Unfortunatelly because C++ library 
-allocates extra memory below the exception address and I did not find a way how 
-to determine the size of it, need to keep the extra memory for stacktrace above
-the exception, so one needs to remember size of the exception itself to be able
-to get to the stack trace block. Other option would be to keep whole stack trace
-in its own memory, but that did not feel as the right approach.
+Designwise I would have liked not to keep any data about exceptions in the 
+library itself, have it all in the memory block allocated for the exception 
+itself. Unfortunatelly because C++ library allocates extra memory below the 
+exception address and I did not find a way how to determine the size of it, so 
+for each active exception we need to keep track of stack trace address. The 
+stack trace itself is in the same memory block as the exception, just above it. 
+Other option would be to keep whole stack trace in the library itself and do 
+own memory allocation for it, but I think that would just ask for problems, 
+when memory is low.
 
-I have looked around, but unfortunatelly did not find any library, which would 
-just work, without any additional instrumentation. Also wanted that stack trace 
-is available for exceptions thrown from standard or third party libraries. 
-
-Here is a list of libraries I had a look at:
+I have looked around, but did not find any library which would meet my goals. 
+Here is a list of a few of them:
 * libunwind (http://www.nongnu.org/libunwind/)
 * libcsdbg (https://sourceforge.net/projects/libcsdbg)
 * Poppy (https://github.com/orling/Poppy)
@@ -28,5 +31,37 @@ Here is a list of libraries I had a look at:
 * c-callstack (https://github.com/Nanolat/c-callstack)
 * backward-cpp (https://github.com/bombela/backward-cpp)
 * dbg library (https://bitbucket.org/edd/dbg/wiki/exception_tracebacks)
+* stacktrace (http://stacktrace.sourceforge.net)
+
+The is probably more attemps around. Most of them one way of another force you 
+to change your code, either through macro for throwing exceptions, putting 
+extra code into every function to keep track of stack or need to inherit from 
+specific exception. The exception one is I think is the cleanest, but still 
+what about code I cannot change or compile? A few which standed out somehow:
+
+* libcsdbg - uses gcc instrumentation for every function to record stack trace,
+  so your code can stay as pure C++, does not work for code you did not compile
+* backward-cpp - if compied with debug info, will also give you file and line
+  numbers plus code snippets if source is available
+
+After the initial version was written I have found following article, which in 
+essence is the same idea as this library is based on:
+
+http://stackoverflow.com/questions/11665829/how-can-i-print-stack-trace-for-caug
+ht-exceptions-in-c-code-injection-in-c
+
+Interesting article about why not do stack traces in C++:
+http://www.di.unipi.it/~nids/docs/i_want_my_pony_or_why_you_cannot_have_cpp_exce
+ptions_with_a_stack_trace.html
+I would not agree with this article. For example if you have a server 
+processing requests, you would not want to core dump every time request failed 
+with exception. It is much better to log the exception including stack trace 
+and just process next. The stack trace usually helps with recognising different 
+root causes for the failures. Bear in mind that the same exception could be 
+thrown from different scenarios and the stack trace is very helpful to identify 
+them.
+
+One last idea I found for Windows, but I do not think we can use on Linux:
+http://code-freeze.blogspot.co.uk/2012/01/generating-stack-traces-from-c.html
 
 Vladimir Michl
