@@ -1,6 +1,8 @@
 /*
     Copyright (c) 2016 Vladimir Michl
 
+    This file is part of Exception Stack Trace library.
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -17,6 +19,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 #include "../include/exception_stack_trace.h"
 
 using namespace exceptionstacktrace;
@@ -77,12 +80,26 @@ void testMyException1() {
   }
 }
 
+void testStdVector() {
+  try {
+    std::cout << "testStdVector: about to throw" << std::endl;
+    std::vector<int> v;
+    v.at(0);
+  } catch (const std::exception &e) {
+    std::cout << "std::exception caught: " << &e << std::endl;
+    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
+  } catch (...) {
+    std::cout << "Exception caught" << std::endl;
+  }
+}
+
 int main() {
   std::cout << "main" << std::endl;
   testRuntimeError();
   testRuntimeError1();
   testMyException();
   testMyException1();
+  testStdVector();
   std::cout << "about to return" << std::endl;
   return 0;
 }

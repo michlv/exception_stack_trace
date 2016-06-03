@@ -1,8 +1,30 @@
-C++ library enable stack trace from exceptions.
+A library to get stack trace from C++ exceptions.
 
-This is proof of concept code, if you are interested, feel free to improve. It is annoying that one cannot get stack trace from exceptions in C++, so this code should allow for this.
+This is proof of concept code, if you are interested, feel free to improve. It 
+is annoying, that one cannot get stack trace from exceptions in C++, so this 
+code should allow for this.
 
-This is by no means production code, but as it stands it seems to work, at least with my non-automated tests.
+This is by no means production code, but as it stands it seems to work, at 
+least with my non-automated tests.
+
+Tried a few different approaches and the current one seems to work. I would 
+have liked not to need any info about exceptions in the module, keep all info 
+in exception allocated memory itself. Unfortunatelly because C++ library 
+allocates extra memory below the exception address and I did not find a way how 
+to determine the size of it, need to keep the extra memory for stacktrace above
+the exception, so one needs to remember size of the exception itself to be able
+to get to the stack trace block. Other option would be to keep whole stack trace
+in its own memory, but that did not feel as the right approach.
+
+I have looked around, but unfortunatelly did not find any library, which would 
+just work, without any additional instrumentation. Also wanted that stack trace 
+is available for exceptions thrown from standard or third party libraries. 
+
+Here is a list of libraries I had a look at:
+* libunwind (http://www.nongnu.org/libunwind/)
+* libcsdbg (https://sourceforge.net/projects/libcsdbg)
+* Poppy (https://github.com/orling/Poppy)
+* ex_diag (https://code.google.com/archive/p/exception-diagnostic/)
+* c-callstack (https://github.com/Nanolat/c-callstack)
 
 Vladimir Michl
- 
