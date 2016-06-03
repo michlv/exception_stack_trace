@@ -26,5 +26,6 @@ Here is a list of libraries I had a look at:
 * Poppy (https://github.com/orling/Poppy)
 * ex_diag (https://code.google.com/archive/p/exception-diagnostic/)
 * c-callstack (https://github.com/Nanolat/c-callstack)
+* backward-cpp (https://github.com/bombela/backward-cpp)
 
 Vladimir Michl
