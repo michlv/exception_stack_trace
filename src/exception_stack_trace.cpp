@@ -29,7 +29,6 @@
 #include <cxxabi.h>
 #include <new>
 
-#define STACK_ENTRIES_MAX 64
 #define STACK_CONCURRENT_MAX 12
 
 #if 0
@@ -37,6 +36,120 @@
 #else
 # define DEBUG(x)
 #endif
+
+namespace {
+  class Demangler {
+    size_t bsize;
+    char *buffer;
+
+  public:
+    Demangler() : bsize(64) {
+      buffer=static_cast<char*>(malloc(bsize));
+    }
+    ~Demangler() {
+      free(buffer);
+    }
+    bool good() const {
+      return buffer;
+    }
+    bool operator !() const {
+      return !good();
+    }
+    
+    const char *operator()(const char *mangled_name) {
+      int status;
+      char *ret = abi::__cxa_demangle(mangled_name, buffer, &bsize, &status);
+      if (ret) {
+	buffer=ret;
+	return ret;
+      }
+      return mangled_name;
+    }
+  };
+
+  struct SimpleStackOutputter : public info::StackTrace::WalkSymbols {
+    std::ostream &os;
+    int i;
+    SimpleStackOutputter(std::ostream &aOs) : os(aOs), i(0) {};
+    void operator()(const char *sname, void *saddr, void *addr, const char *fname) {
+      os << "#" << i++ << " " << sname;
+      if (fname) {
+	os << "(" << fname << ")";
+      }
+      os << std::endl;
+    }
+  };
+}
+
+namespace info {
+  StackTrace::StackTrace(const int suppressTopXSymbols, const char *aName)
+    : suppress_top_x_symbols(suppressTopXSymbols), name(aName)
+  {
+    size = backtrace(stack, stack_size_max);
+  };
+
+  int StackTrace::getRaw(void * const *&stacktrace) const
+  {
+    DEBUG(printf("stack trace: %p\n", stack));
+    stacktrace = &stack[suppress_top_x_symbols];
+    return size-suppress_top_x_symbols;
+  }
+  const char *StackTrace::getName() const {
+    return name;
+  }
+
+  std::string StackTrace::getSymbols() const {
+    std::ostringstream os;
+    void *const *stack;
+    int size=getRaw(stack);
+    Demangler demangler;
+    if (!demangler)
+      return "";
+    char **text=backtrace_symbols(stack, size);
+    if (name) {
+      os << demangler(name) << std::endl;
+    }
+    for (int i = 0; i < size; ++i) {
+      std::string str(text[i]);
+      size_t s=str.find_first_of('(');
+      size_t e=str.find_last_of('+');
+      if (s!=std::string::npos && e!=std::string::npos) {
+	std::string n = str.substr(s+1, e-s-1);
+	str.replace(s+1, e-s-1, demangler(n.c_str()));
+      }
+      os << str << std::endl;
+    }
+    free(text);
+    return os.str();
+  }
+  
+  void StackTrace::walkSymbols(WalkSymbols &callBack) const {
+    void *const *stack;
+    int size=getRaw(stack);
+    Dl_info dl_info;
+    Demangler demangler;
+    if (!demangler)
+      return;
+    for (int i = 0; i < size; ++i) {
+      if (dladdr(stack[i], &dl_info) && dl_info.dli_sname != NULL) {
+	callBack(demangler(dl_info.dli_sname),
+		 dl_info.dli_saddr, stack[i], dl_info.dli_fname);
+      }
+    }
+  }
+  
+  std::string StackTrace::getSimpleStackTrace() const {
+    std::ostringstream os;
+    Demangler demangler;
+    if (!demangler)
+      return "";
+    if (name)
+      os << demangler(name) << std::endl;
+    SimpleStackOutputter o(os);
+    walkSymbols(o);
+    return os.str();
+  }
+}
 
 namespace {
   void *(*real_cxa_allocate_exception)(size_t size) = 0;
@@ -58,39 +171,35 @@ namespace {
     real_cxa_free_exception = (void *(*)(void *))get_real_function("__cxa_free_exception");
     real_cxa_throw = (void (*)(void *exception, struct std::type_info * tinfo, void (*dest)(void *)))get_real_function("__cxa_throw");
   }
-  
-  struct StackTrace {
-    int size;
-    const char *name;
-    void *stack[STACK_ENTRIES_MAX];
-  };
 
   struct ExceptionData {
     void *exception;
-    StackTrace *stack_trace;
+    info::StackTrace *stack_trace;
   };
     
   __thread int exception_data_index=-1;
   __thread ExceptionData exception_data[STACK_CONCURRENT_MAX];
 
-  char *demangle(const char *mangled_name, char *output_buffer, size_t *length, int *status) {
-    char *ret = abi::__cxa_demangle(mangled_name, output_buffer, length, status);
-    if (!ret)
-      return output_buffer;
-    return ret;
-  }
+  const info::StackTrace *findStackForException(const void *exception) {
+    for (int i=exception_data_index; i >=0; --i) {
+      if (exception_data[i].exception == exception) {
+	return exception_data[i].stack_trace;
+      }
+    }
+    return NULL;
+  };
 }
 
 extern "C" {
   void * __cxa_allocate_exception(size_t size) {
     void *ret=0;
     DEBUG(printf("exception allocated\n"));
-    ret = real_cxa_allocate_exception(size+sizeof(StackTrace));
+    ret = real_cxa_allocate_exception(size+sizeof(info::StackTrace));
     void *stack=static_cast<uint8_t*>(ret)+size;
     DEBUG(printf("exception allocated raw: %p\n", ret));
     ++exception_data_index;
     exception_data[exception_data_index].exception=ret;
-    exception_data[exception_data_index].stack_trace = static_cast<StackTrace *>(stack);
+    exception_data[exception_data_index].stack_trace = static_cast<info::StackTrace *>(stack);
     DEBUG(printf("exception allocated ret: %p\n", ret));
     return ret;
   }
@@ -102,58 +211,24 @@ extern "C" {
 
   void __cxa_throw(void *exception, struct std::type_info * tinfo, void (*dest)(void *)) {
     DEBUG(printf("throw in: %p\n", exception));
-    StackTrace &stack=*exception_data[exception_data_index].stack_trace;
-    stack.size = backtrace(stack.stack, STACK_ENTRIES_MAX);
-    stack.name = tinfo->name();
+    info::StackTrace *stack=exception_data[exception_data_index].stack_trace;
+    stack = new (stack) info::StackTrace(2, tinfo->name());
     real_cxa_throw(exception, tinfo, dest);
   };
 }
 
 namespace exceptionstacktrace {
-  int get_stack_trace_raw(void * const *&stacktrace, const char *&name, const void *exception) {
-    DEBUG(printf("stack trace raw: %p\n", exception));
-    const StackTrace *stack=0;
-    for (int i=exception_data_index; i >=0; --i) {
-      if (exception_data[i].exception == exception) {
-	stack = exception_data[i].stack_trace;
-	break;
-      }
-    }
-    DEBUG(printf("stack trace: %p\n", stack));
-    stacktrace = stack->stack;
-    name = stack->name;
-    return stack->size;
+  const info::StackTrace *getStackTrace(const void *exception) {
+    return findStackForException(exception);
   }
-
+  const info::StackTrace *getStackTrace(const std::exception &exception) {
+    return getStackTrace(&exception);
+  }
   std::string get_stack_trace_names(const void *exception) {
-    std::ostringstream os;
-    void *const *stack;
-    const char *name;
-    int size=get_stack_trace_raw(stack, name, exception);
-    size_t bsize=64;
-    char *buffer=static_cast<char*>(malloc(bsize));
-    if (!buffer)
+    const info::StackTrace *stack = findStackForException(exception);
+    if (!stack)
       return "";
-    char **text=backtrace_symbols(stack, size);
-    int status;
-    buffer = demangle(name, buffer, &bsize, &status);
-    os << (status==0?buffer:name) << std::endl;
-    for (int i = stack_trace_raw_start_index; i < size; ++i) {
-      std::string str(text[i]);
-      size_t s=str.find_first_of('(');
-      size_t e=str.find_last_of('+');
-      if (s!=std::string::npos && e!=std::string::npos) {
-	std::string n = str.substr(s+1, e-s-1);
-	buffer=demangle(n.c_str(), buffer, &bsize, &status);
-	if (status == 0) {
-	  str.replace(s+1, e-s-1, buffer);
-	}
-      }
-      os << str << std::endl;
-    }
-    free(text);
-    free(buffer);
-    return os.str();
+    return stack->getSymbols();
   }
 
   std::string get_stack_trace_names(const std::exception &exception) {

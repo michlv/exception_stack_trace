@@ -11,5 +11,13 @@ main: main.cpp
 	g++ -Wall -rdynamic -g -o main main.cpp -Wl,-rpath=${LIBPATH} -L ${LIBPATH} -lexception_stack_trace
 #	g++ -Wall -rdynamic -g -o main main.cpp 
 
-.PHONY: all clean
+test: run valgrind
+
+run:
+	./main
+
+valgrind:
+	valgrind --track-origins=yes --leak-check=full ./main
+
+.PHONY: all clean valgrind
 

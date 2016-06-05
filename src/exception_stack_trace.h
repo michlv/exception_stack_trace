@@ -20,9 +20,31 @@
 #include <string>
 #include <stdexcept>
 
+namespace info {
+  class StackTrace {
+    static const int stack_size_max = 64;
+    const int suppress_top_x_symbols;
+    const char *name;
+    int size;
+    void *stack[stack_size_max];
+
+  public:
+    struct WalkSymbols {
+      virtual void operator()(const char *sname, void *saddr, void *addr, const char *fname) = 0;
+    };
+    
+    StackTrace(const int suppressTopXSymbols=1, const char *aName=NULL);
+    int getRaw(void * const *&stacktrace) const;
+    const char *getName() const ;
+    void walkSymbols(WalkSymbols &callBack) const;
+    std::string getSymbols() const;
+    std::string getSimpleStackTrace() const;
+  };
+}
+
 namespace exceptionstacktrace {
-  const int stack_trace_raw_start_index = 1;
-  int get_stack_trace_raw(void * const *&stacktrace, const char *&name, const void *exception);
+  const info::StackTrace *getStackTrace(const void *exception);
+  const info::StackTrace *getStackTrace(const std::exception &exception);
   std::string get_stack_trace_names(const void *exception);
   std::string get_stack_trace_names(const std::exception &exception);
 }

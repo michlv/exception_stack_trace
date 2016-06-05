@@ -39,6 +39,7 @@ void name() { \
   } catch (const catch_exception &e) { \
     std::cout << #catch_exception << "(" << #throw_exception << ") caught: " << &e << std::endl; \
     std::cout << "stack: " << std::endl << get_stack_trace_names(e); \
+    std::cout << "stackSimple: " << std::endl << getStackTrace(e)->getSimpleStackTrace(); \
   } catch (...) { \
     std::cout << "... caught" << std::endl; \
   } \
@@ -58,6 +59,7 @@ void testStdVector() {
   } catch (const std::exception &e) {
     std::cout << "std::exception(vector.at(0)) caught: " << &e << std::endl;
     std::cout << "stack: " << std::endl << get_stack_trace_names(e);
+    std::cout << "stackSimple: " << std::endl << getStackTrace(e)->getSimpleStackTrace();
   } catch (...) {
     std::cout << "... caught" << std::endl;
   }
