@@ -22,13 +22,8 @@
 
 namespace info {
   class StackTrace {
-    static const int stack_size_max = 64;
-    const int suppress_top_x_symbols;
-    const char *name;
-    int size;
-    void *stack[stack_size_max];
-
   public:
+    static const int stack_size_max = 64;
     struct WalkSymbols {
       virtual void operator()(const char *sname, void *saddr, void *addr, const char *fname) = 0;
     };
@@ -39,6 +34,12 @@ namespace info {
     void walkSymbols(WalkSymbols &callBack) const;
     std::string getSymbols() const;
     std::string getSimpleStackTrace() const;
+
+  private:
+    const int suppress_top_x_symbols;
+    const char *name;
+    int size;
+    void *stack[stack_size_max];
   };
 }
 

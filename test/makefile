@@ -17,7 +17,7 @@ run:
 	./main
 
 valgrind:
-	valgrind --track-origins=yes --leak-check=full ./main
+	valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./main
 
 .PHONY: all clean valgrind
 

@@ -146,7 +146,30 @@ int testDoubleException() {
   return 0;
 };
 
-	       
+
+class DeepException: public std::exception {
+};
+
+int testDeepStackWalk(int depth) {
+  if (depth > 0)
+    return testDeepStackWalk(depth-1);
+
+  throw DeepException();
+}
+
+int testDeepStack(int depth) {
+  try {
+    testDeepStackWalk(depth);
+  } catch (const std::exception &e) {
+    std::string symbols=getStackTrace(e)->getSymbols();
+    std::cout << symbols << std::endl;
+    std::string simpleStack=getStackTrace(e)->getSimpleStackTrace();
+    std::cout << simpleStack << std::endl;
+    //EXPECT_EQ(expectedOuterException, simpleStack);    
+  }
+  return 0;
+}
+
 int main() {
   std::cout << "main" << std::endl;
   int error=0;
@@ -156,6 +179,7 @@ int main() {
   error += testMyException1();
   error += testStdVector();
   error += testDoubleException();
+  error += testDeepStack(info::StackTrace::stack_size_max);
   std::cout << "about to return" << std::endl;
   return error;
 }
