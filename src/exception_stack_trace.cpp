@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <cxxabi.h>
 #include <new>
+#include <iomanip>
 
 #define STACK_CONCURRENT_MAX 12
 
@@ -72,7 +73,7 @@ namespace {
     int i;
     SimpleStackOutputter(std::ostream &aOs) : os(aOs), i(0) {};
     void operator()(const char *sname, void *saddr, void *addr, const char *fname) {
-      os << "#" << i++ << " " << sname;
+      os << "#" << std::setw(2) << std::setfill(' ') << i++ << " " << sname;
       if (fname) {
 	os << "(" << fname << ")";
       }
