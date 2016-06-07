@@ -22,14 +22,17 @@
 #include <vector>
 #include "../include/exception_stack_trace.h"
 
-#define EXPECT_EQ(expected, actual) \
-  if (expected != actual) { \
-    std::cout << "Failed!"; \
-    std::cout << "Expected: " << std::endl << "'" << expected << "'" << std::endl; \
-    std::cout << "Actual: " << std::endl << "'" <<  actual << "'" << std::endl;	\
-    return 1; \
-  } \
-
+#define EXPECT_EQ(aExpected, aActual) \
+  { \
+    std::string expected=aExpected; \
+    std::string actual=aActual;	    \
+    if (expected != actual) {			\
+      std::cout << "Failed!";						\
+      std::cout << "Expected: " << std::endl << "'" << expected << "'" << std::endl; \
+      std::cout << "Actual: " << std::endl << "'" <<  actual << "'" << std::endl; \
+      return 1;								\
+    }									\
+  }
 
 using namespace exceptionstacktrace;
 
@@ -40,14 +43,14 @@ struct MyException : public std::runtime_error {
   };
 };
 
-#define THROW_TEST(name, throw_exception, catch_exception, expected_simple_stack)	\
+#define THROW_CODE_TEST(name, throw_code, catch_exception, expected_simple_stack) \
 int name() { \
   try { \
   std::cout << std::endl << "=================" << std::endl; \
     std::cout << #name << ": about to throw" << std::endl;	\
-    throw throw_exception; \
+    throw_code ;						\
   } catch (const catch_exception &e) { \
-    std::cout << #catch_exception << "(" << #throw_exception << ") caught: " << &e << std::endl; \
+    std::cout << #catch_exception << "(" << #throw_code << ") caught: " << &e << std::endl; \
     std::cout << "stack: " << std::endl << get_stack_trace_names(e); \
     std::string simpleStack = getStackTrace(e)->getSimpleStackTrace(); \
     std::cout << "stackSimple: " << std::endl << simpleStack;	       \
@@ -60,56 +63,90 @@ int name() { \
   return 0; \
 }
 
+#define THROW_TEST(name, throw_exception, catch_exception, expected_simple_stack) \
+  THROW_CODE_TEST(name, throw throw_exception, catch_exception, expected_simple_stack)
+
 THROW_TEST(testRuntimeError, std::runtime_error("Hello"), std::exception, "\
 std::runtime_error\n\
-# 0 testRuntimeError()(./main)\n\
-# 1 main(./main)\n\
-# 2 __libc_start_main(/lib/x86_64-linux-gnu/libc.so.6)\n\
+# 0 testRuntimeError(){./main}\n\
+# 1 main{./main}\n\
+# 2 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
 ");
 THROW_TEST(testRuntimeError1, std::runtime_error("Hello"), std::runtime_error, "\
 std::runtime_error\n\
-# 0 testRuntimeError1()(./main)\n\
-# 1 main(./main)\n\
-# 2 __libc_start_main(/lib/x86_64-linux-gnu/libc.so.6)\n\
+# 0 testRuntimeError1(){./main}\n\
+# 1 main{./main}\n\
+# 2 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
 ");
 THROW_TEST(testMyException, MyException("Hello"), std::exception, "\
 MyException\n\
-# 0 testMyException()(./main)\n\
-# 1 main(./main)\n\
-# 2 __libc_start_main(/lib/x86_64-linux-gnu/libc.so.6)\n\
+# 0 testMyException(){./main}\n\
+# 1 main{./main}\n\
+# 2 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
 ");
 THROW_TEST(testMyException1, MyException("Hello"), MyException, "\
 MyException\n\
-# 0 testMyException1()(./main)\n\
-# 1 main(./main)\n\
-# 2 __libc_start_main(/lib/x86_64-linux-gnu/libc.so.6)\n\
+# 0 testMyException1(){./main}\n\
+# 1 main{./main}\n\
+# 2 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
 ");
 
-int testStdVector() {
-  try {
-    std::vector<int> v;
-    v.at(0);
-  } catch (const std::exception &e) {
-    std::cout << "std::exception(vector.at(0)) caught: " << &e << std::endl;
-    //    std::cout << "stack: " << std::endl << get_stack_trace_names(e);
-    std::string simpleStack=getStackTrace(e)->getSimpleStackTrace();
-    std::string expected="\
+THROW_CODE_TEST(testStdVector, std::vector<int> v; v.at(0), std::exception,"\
 std::out_of_range\n\
-# 0 std::__throw_out_of_range_fmt(char const*, ...)(/usr/lib/x86_64-linux-gnu/libstdc++.so.6)\n\
-# 1 std::vector<int, std::allocator<int> >::_M_range_check(unsigned long) const(./main)\n\
-# 2 std::vector<int, std::allocator<int> >::at(unsigned long)(./main)\n\
-# 3 testStdVector()(./main)\n\
-# 4 main(./main)\n\
-# 5 __libc_start_main(/lib/x86_64-linux-gnu/libc.so.6)\n\
+# 0 std::__throw_out_of_range_fmt(char const*, ...){/usr/lib/x86_64-linux-gnu/libstdc++.so.6}\n\
+# 1 std::vector<int, std::allocator<int> >::_M_range_check(unsigned long) const{./main}\n\
+# 2 std::vector<int, std::allocator<int> >::at(unsigned long){./main}\n\
+# 3 testStdVector(){./main}\n\
+# 4 main{./main}\n\
+# 5 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
+");
+
+class InnerException: public std::exception {
+};
+
+class OutterException: public std::exception {
+};
+
+std::string expectedOuterException="\
+OutterException\n\
+# 0 testDoubleException(){./main}\n\
+# 1 main{./main}\n\
+# 2 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
 ";
-    EXPECT_EQ(expected, simpleStack);
-    std::cout << "stackSimple: " << std::endl << getStackTrace(e)->getSimpleStackTrace();
-  } catch (...) {
-    std::cout << "... caught" << std::endl;
+
+int testDoubleExceptionInner(const std::exception &outer) {
+  try {
+    throw InnerException();
+  } catch (const std::exception &e) {
+    std::string simpleStack=getStackTrace(e)->getSimpleStackTrace();
+    std::cout << simpleStack << std::endl;
+    EXPECT_EQ("\
+InnerException\n\
+# 0 testDoubleExceptionInner(std::exception const&){./main}\n\
+# 1 testDoubleException(){./main}\n\
+# 2 main{./main}\n\
+# 3 __libc_start_main{/lib/x86_64-linux-gnu/libc.so.6}\n\
+", simpleStack);
+    simpleStack=getStackTrace(outer)->getSimpleStackTrace();
+    std::cout << simpleStack << std::endl;      
+    EXPECT_EQ(expectedOuterException, simpleStack);
   }
   return 0;
-}
+};
 
+int testDoubleException() {
+  try {
+    throw OutterException();
+  } catch (const std::exception &e) {
+    std::string simpleStack=getStackTrace(e)->getSimpleStackTrace();
+    std::cout << simpleStack << std::endl;
+    EXPECT_EQ(expectedOuterException, simpleStack);
+    return testDoubleExceptionInner(e);
+  }
+  return 0;
+};
+
+	       
 int main() {
   std::cout << "main" << std::endl;
   int error=0;
@@ -118,6 +155,7 @@ int main() {
   error += testMyException();
   error += testMyException1();
   error += testStdVector();
+  error += testDoubleException();
   std::cout << "about to return" << std::endl;
   return error;
 }

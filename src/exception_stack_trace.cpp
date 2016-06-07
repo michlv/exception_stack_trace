@@ -75,7 +75,7 @@ namespace {
     void operator()(const char *sname, void *saddr, void *addr, const char *fname) {
       os << "#" << std::setw(2) << std::setfill(' ') << i++ << " " << sname;
       if (fname) {
-	os << "(" << fname << ")";
+	os << "{" << fname << "}";
       }
       os << std::endl;
     }
@@ -181,6 +181,13 @@ namespace {
   __thread int exception_data_index=-1;
   __thread ExceptionData exception_data[STACK_CONCURRENT_MAX];
 
+  void check_exception_data(void *exception) {
+    if (exception_data_index < 0 || exception_data[exception_data_index].exception != exception) {
+      fprintf(stderr, "__cxa_free_exception: index < 0 or out of order exception: %i %p", exception_data_index, exception);
+      std::terminate();
+    }
+  };
+
   const info::StackTrace *findStackForException(const void *exception) {
     for (int i=exception_data_index; i >=0; --i) {
       if (exception_data[i].exception == exception) {
@@ -206,12 +213,14 @@ extern "C" {
   }
   void __cxa_free_exception(void *exception) {
     DEBUG(printf("exception free in: %p\n", exception));
+    check_exception_data(exception);
     --exception_data_index;
     real_cxa_free_exception(exception);
   }
 
   void __cxa_throw(void *exception, struct std::type_info * tinfo, void (*dest)(void *)) {
     DEBUG(printf("throw in: %p\n", exception));
+    check_exception_data(exception);
     info::StackTrace *stack=exception_data[exception_data_index].stack_trace;
     stack = new (stack) info::StackTrace(2, tinfo->name());
     real_cxa_throw(exception, tinfo, dest);
