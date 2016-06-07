@@ -151,7 +151,7 @@ class DeepException: public std::exception {
 };
 
 int testDeepStackWalk(int depth) {
-  if (depth > 0)
+  if (depth > 1)
     return testDeepStackWalk(depth-1);
 
   throw DeepException();
@@ -179,6 +179,7 @@ int main() {
   error += testMyException1();
   error += testStdVector();
   error += testDoubleException();
+  error += testDeepStack(5);
   error += testDeepStack(info::StackTrace::stack_size_max);
   std::cout << "about to return" << std::endl;
   return error;
