@@ -64,4 +64,7 @@ them.
 One last idea I found for Windows, but I do not think we can use on Linux:
 http://code-freeze.blogspot.co.uk/2012/01/generating-stack-traces-from-c.html
 
+One last library which seems to do very similar task as this one:
+https://github.com/tnakagome/exray
+
 Vladimir Michl
