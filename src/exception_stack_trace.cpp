@@ -73,7 +73,8 @@ namespace {
     int i;
     SimpleStackOutputter(std::ostream &aOs) : os(aOs), i(0) {};
     void operator()(const char *sname, void *saddr, void *addr, const char *fname) {
-      os << "#" << std::setw(2) << std::setfill(' ') << i++ << " " << sname;
+      os << "#" << std::setw(2) << std::setfill(' ') << i++
+	 << ": " << (sname?sname:"??");
       if (fname) {
 	os << "{" << fname << "}";
       }
@@ -132,7 +133,7 @@ namespace info {
     if (!demangler)
       return;
     for (int i = 0; i < size; ++i) {
-      if (dladdr(stack[i], &dl_info) && dl_info.dli_sname != NULL) {
+      if (dladdr(stack[i], &dl_info)) {
 	callBack(demangler(dl_info.dli_sname),
 		 dl_info.dli_saddr, stack[i], dl_info.dli_fname);
       }
@@ -227,21 +228,28 @@ extern "C" {
   };
 }
 
-namespace exceptionstacktrace {
+namespace exception {
+  void *getCurrent() {
+    if (exception_data_index<0)
+      return 0;
+    return exception_data[exception_data_index].exception;
+  };
   const info::StackTrace *getStackTrace(const void *exception) {
     return findStackForException(exception);
   }
   const info::StackTrace *getStackTrace(const std::exception &exception) {
     return getStackTrace(&exception);
   }
-  std::string get_stack_trace_names(const void *exception) {
+  std::string get_stack_trace_symbols(const void *exception) {
     const info::StackTrace *stack = findStackForException(exception);
     if (!stack)
       return "";
     return stack->getSymbols();
   }
-
-  std::string get_stack_trace_names(const std::exception &exception) {
-    return get_stack_trace_names(&exception);
+  std::string get_stack_trace_symbols(const std::exception &exception) {
+    return get_stack_trace_symbols(&exception);
+  }
+  std::string get_current_exception_stack_trace_symbols(const std::exception &exception) {
+    return get_stack_trace_symbols(getCurrent());
   }
 }

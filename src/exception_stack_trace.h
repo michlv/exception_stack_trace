@@ -43,9 +43,11 @@ namespace info {
   };
 }
 
-namespace exceptionstacktrace {
+namespace exception {
+  void *getCurrent();
   const info::StackTrace *getStackTrace(const void *exception);
   const info::StackTrace *getStackTrace(const std::exception &exception);
-  std::string get_stack_trace_names(const void *exception);
-  std::string get_stack_trace_names(const std::exception &exception);
+  std::string get_stack_trace_symbols(const void *exception);
+  std::string get_stack_trace_symbols(const std::exception &exception);
+  std::string get_current_exception_stack_trace_symbols();
 }
